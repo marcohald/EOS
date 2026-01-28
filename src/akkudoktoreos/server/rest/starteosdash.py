@@ -365,6 +365,7 @@ async def run_eosdash_supervisor() -> None:
         env["EOS_DIR"] = eos_dir
         env["EOS_DATA_DIR"] = eos_data_dir
         env["EOS_CONFIG_DIR"] = eos_config_dir
+        env["LOGURU_LEVEL"] = log_level.upper()
 
         logger.info("Starting EOSdash subprocess...")
 
