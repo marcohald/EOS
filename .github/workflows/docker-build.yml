@@ -14,8 +14,6 @@ on:
       - '**'
 
 env:
-  DOCKERHUB_REPO: akkudoktor/eos
-  GHCR_REPO: ghcr.io/akkudoktor-eos/eos
   EOS_LICENSE: Apache-2.0
 
 # From https://docs.docker.com/build/ci/github-actions/multi-platform/
@@ -64,13 +62,13 @@ jobs:
         run: |
           platform=${{ matrix.platform }}
           echo "PLATFORM_PAIR=${platform//\//-}" >> $GITHUB_ENV
+          echo "GHCR_REPO=ghcr.io/${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
 
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: |
-            ${{ env.DOCKERHUB_REPO }}
             ${{ env.GHCR_REPO }}
           labels: |
             org.opencontainers.image.licenses=${{ env.EOS_LICENSE }}
@@ -84,14 +82,6 @@ jobs:
         id: get_description
         run: |
           echo "EOS_REPO_DESCRIPTION=$(jq -cr '.labels."org.opencontainers.image.description"' <<< "$DOCKER_METADATA_OUTPUT_JSON")" >> $GITHUB_ENV
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        # skip for pull requests
-        if: ${{ github.event_name != 'pull_request' }}
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
       - name: Login to GHCR
         uses: docker/login-action@v3
@@ -117,15 +107,7 @@ jobs:
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
           annotations: ${{ steps.meta.outputs.annotations }}
-          outputs: type=image,"name=${{ env.DOCKERHUB_REPO }},${{ env.GHCR_REPO }}",push-by-digest=true,name-canonical=true,"push=${{ github.event_name != 'pull_request' }}","annotation-index.org.opencontainers.image.description=${{ env.EOS_REPO_DESCRIPTION }}"
-
-      - name: Generate artifact attestation DockerHub
-        uses: actions/attest-build-provenance@v2
-        if: ${{ github.event_name != 'pull_request' }}
-        with:
-          subject-name: docker.io/${{ env.DOCKERHUB_REPO }}
-          subject-digest: ${{ steps.build.outputs.digest }}
-          push-to-registry: true
+          outputs: type=image,"name=${{ env.GHCR_REPO }}",push-by-digest=true,name-canonical=true,"push=${{ github.event_name != 'pull_request' }}","annotation-index.org.opencontainers.image.description=${{ env.EOS_REPO_DESCRIPTION }}"
 
       - name: Generate artifact attestation GitHub
         uses: actions/attest-build-provenance@v2
@@ -160,18 +142,16 @@ jobs:
     # skip for pull requests
     if: ${{ github.event_name != 'pull_request' }}
     steps:
+      - name: Prepare
+        run: |
+          echo "GHCR_REPO=ghcr.io/${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
+
       - name: Download digests
         uses: actions/download-artifact@v4
         with:
           path: /tmp/digests
           pattern: digests-*
           merge-multiple: true
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
       - name: Login to GHCR
         uses: docker/login-action@v3
@@ -188,7 +168,6 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            ${{ env.DOCKERHUB_REPO }}
             ${{ env.GHCR_REPO }}
           tags: |
             type=ref,event=branch
@@ -207,11 +186,8 @@ jobs:
         working-directory: /tmp/digests
         run: |
           docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf '${{ env.DOCKERHUB_REPO }}@sha256:%s ' *)
-          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
             $(printf '${{ env.GHCR_REPO }}@sha256:%s ' *)
 
       - name: Inspect image
         run: |
-          docker buildx imagetools inspect ${{ env.DOCKERHUB_REPO }}:${{ steps.meta.outputs.version }}
           docker buildx imagetools inspect ${{ env.GHCR_REPO }}:${{ steps.meta.outputs.version }}
