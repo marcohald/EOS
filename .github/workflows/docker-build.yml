@@ -27,23 +27,9 @@ env:
 jobs:
   # Build platform matrix excludes. if-conditional with matrix on job level is not
   # supported, see https://github.com/actions/runner/issues/1985
-  platform-excludes:
-    runs-on: ubuntu-latest
-    outputs:
-      excludes: ${{ steps.excludes.outputs.matrix }}
-    steps:
-      - id: excludes
-        run: |
-          if ${{ github.event_name == 'pull_request' }}; then
-            echo 'matrix=[
-              {"platform": "linux/arm64"}
-            ]' | tr -d '[:space:]' >> $GITHUB_OUTPUT
-          else
-            echo 'matrix=[]' >> $GITHUB_OUTPUT
-          fi
+
 
   build:
-    needs: platform-excludes
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -55,8 +41,6 @@ jobs:
       matrix:
         platform:
           - linux/amd64
-          - linux/arm64
-        exclude: ${{ fromJSON(needs.platform-excludes.outputs.excludes) }}
     steps:
       - name: Prepare
         run: |
