@@ -39,6 +39,21 @@ from akkudoktoreos.server.server import (
 )
 from akkudoktoreos.utils.stringutil import str2bool
 
+# ------------------------------------
+# Logging configuration pre-startup
+# ------------------------------------
+
+# Configure logging to suppress verbose config dumps during get_config()
+# unless explicitly requested via environment variable.
+try:
+    _startup_log_level = os.environ.get("LOGURU_LEVEL", "INFO").upper()
+    logger.remove()
+    logger.add(sys.stderr, level=_startup_log_level)
+except Exception:
+    # Fallback to INFO if anything goes wrong (e.g. invalid level name)
+    logger.remove()
+    logger.add(sys.stderr, level="INFO")
+
 config_eos = get_config()
 
 
